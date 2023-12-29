@@ -41,7 +41,7 @@ func Main() {
 		if err := scanner.Err(); err != nil {
 			log.Fatal(err)
 		}
-		line_value = 10*firstInt(line) + lastInt(line)
+		line_value = 10*firstInt(&line) + lastInt(&line)
 		// log.Printf("Line %s yielded value %d", line, line_value)
 		sum += line_value
 	}
@@ -72,15 +72,15 @@ func lastString(line string) int {
 }
 
 // Locate the first integer in the string
-func firstInt(line string) int {
+func firstInt(line *string) int {
 	numeral, numeral_idx := 0, -1
-	for idx, chr := range line {
+	for idx, chr := range *line {
 		if unicode.IsDigit(chr) {
 			numeral, numeral_idx = int(chr-ZERO), idx
 			break
 		}
 	}
-	prefix := line[:numeral_idx]
+	prefix := (*line)[:numeral_idx]
 	if first_string := firstString(prefix); first_string != -1 {
 		numeral = first_string
 	}
@@ -88,17 +88,17 @@ func firstInt(line string) int {
 }
 
 // Locate the last integer in the string
-func lastInt(line string) int {
+func lastInt(line *string) int {
 	numeral, numeral_idx := 0, 0
 	var chr rune
-	for idx := len(line) - 1; idx >= 0; idx-- {
-		chr = rune(line[idx])
+	for idx := len(*line) - 1; idx >= 0; idx-- {
+		chr = rune((*line)[idx])
 		if unicode.IsDigit(chr) {
 			numeral, numeral_idx = int(chr-ZERO), idx
 			break
 		}
 	}
-	suffix := line[numeral_idx:]
+	suffix := (*line)[numeral_idx:]
 	if last_string := lastString(suffix); last_string != -1 {
 		numeral = last_string
 	}

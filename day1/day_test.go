@@ -1,6 +1,6 @@
 // I have not yet figured out how to set up testing so this will
 // eventually be setup correctly
-package main
+package day1
 
 import "testing"
 

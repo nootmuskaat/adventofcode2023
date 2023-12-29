@@ -33,7 +33,7 @@ func Main() {
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
 
-	var line_values []int
+	sum := 0
 	var line_value int
 
 	for scanner.Scan() {
@@ -43,10 +43,9 @@ func Main() {
 		}
 		line_value = 10*firstInt(line) + lastInt(line)
 		// log.Printf("Line %s yielded value %d", line, line_value)
-		line_values = append(line_values, line_value)
+		sum += line_value
 	}
 
-	sum := sumValues(&line_values)
 	log.Printf("Sum: %d\n", sum)
 }
 
@@ -66,8 +65,7 @@ func lastString(line string) int {
 	numeral, numeral_idx := -1, -1
 	for k, v := range NUMBERS_AS_TEXT {
 		if idx := strings.LastIndex(line, k); idx != -1 && idx > numeral_idx {
-			numeral_idx = idx
-			numeral = v
+			numeral, numeral_idx = v, idx
 		}
 	}
 	return numeral
@@ -78,8 +76,7 @@ func firstInt(line string) int {
 	numeral, numeral_idx := 0, -1
 	for idx, chr := range line {
 		if unicode.IsDigit(chr) {
-			numeral = int(chr - ZERO)
-			numeral_idx = idx
+			numeral, numeral_idx = int(chr-ZERO), idx
 			break
 		}
 	}
@@ -94,11 +91,10 @@ func firstInt(line string) int {
 func lastInt(line string) int {
 	numeral, numeral_idx := 0, 0
 	var chr rune
-	for i := len(line) - 1; i >= 0; i-- {
-		chr = rune(line[i])
+	for idx := len(line) - 1; idx >= 0; idx-- {
+		chr = rune(line[idx])
 		if unicode.IsDigit(chr) {
-			numeral = int(chr - ZERO)
-			numeral_idx = i
+			numeral, numeral_idx = int(chr-ZERO), idx
 			break
 		}
 	}
@@ -107,11 +103,4 @@ func lastInt(line string) int {
 		numeral = last_string
 	}
 	return numeral
-}
-
-func sumValues(values *[]int) (sum int) {
-	for _, i := range *values {
-		sum += i
-	}
-	return
 }

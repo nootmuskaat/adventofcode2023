@@ -15,15 +15,47 @@ type Draw struct {
 	red, green, blue uint64
 }
 
+func (d Draw) contains(other *Draw) bool {
+	return other.red <= d.red && other.green <= d.green && other.blue <= d.blue
+}
+
+func maxDraw(draws ...Draw) *Draw {
+	combined := Draw{}
+	for _, draw := range draws {
+		if draw.red > combined.red {
+			combined.red = draw.red
+		}
+		if draw.green > combined.green {
+			combined.green = draw.green
+		}
+		if draw.blue > combined.blue {
+			combined.blue = draw.blue
+		}
+	}
+	return &combined
+}
+
 func Main() {
 	allGames := readGames()
-	for gameNo, game := range *allGames {
-		fmt.Printf("Game %d: ", gameNo)
-		for drawNo, draw := range game {
-			fmt.Printf("draw %d: %v |", drawNo, draw)
+
+	// Part 1
+	// Determine which games would have been possible if the bag had been loaded with only
+	// 12 red cubes, 13 green cubes, and 14 blue cubes. What is the sum of the IDs of those games?
+	limit := Draw{12, 13, 14}
+	sum := 0
+
+	for gameNo, draws := range *allGames {
+		// fmt.Printf("Game %d: ", gameNo+1)
+		// for drawNo, draw := range draws {
+		// 	fmt.Printf("draw %d: %v | ", drawNo+1, draw)
+		// }
+		maxPossibleDraw := maxDraw(draws...)
+		// fmt.Printf("max: %v\n", maxPossibleDraw)
+		if limit.contains(maxPossibleDraw) {
+			sum += gameNo + 1
 		}
-		fmt.Println()
 	}
+	fmt.Println("Sum", sum)
 }
 
 func readGames() *[][]Draw {
@@ -35,8 +67,6 @@ func readGames() *[][]Draw {
 	}
 	defer f.Close()
 
-	tmp_counter := 0
-
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -46,12 +76,6 @@ func readGames() *[][]Draw {
 
 		game := readLine(&line)
 		games = append(games, *game)
-
-		tmp_counter++
-		if tmp_counter >= 10 {
-			break
-		}
-
 	}
 	return &games
 }
@@ -86,5 +110,4 @@ func readLine(line *string) *[]Draw {
 		draws = append(draws, Draw{red, green, blue})
 	}
 	return &draws
-
 }

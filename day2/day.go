@@ -19,6 +19,10 @@ func (d Draw) contains(other *Draw) bool {
 	return other.red <= d.red && other.green <= d.green && other.blue <= d.blue
 }
 
+func (d Draw) Power() uint64 {
+	return d.red * d.green * d.blue
+}
+
 func maxDraw(draws ...Draw) *Draw {
 	combined := Draw{}
 	for _, draw := range draws {
@@ -41,19 +45,20 @@ func Main() {
 	// Part 1
 	// Determine which games would have been possible if the bag had been loaded with only
 	// 12 red cubes, 13 green cubes, and 14 blue cubes. What is the sum of the IDs of those games?
-	limit := Draw{12, 13, 14}
-	sum := 0
+	// limit := Draw{12, 13, 14}
+	var sum uint64
 
-	for gameNo, draws := range *allGames {
-		// fmt.Printf("Game %d: ", gameNo+1)
-		// for drawNo, draw := range draws {
-		// 	fmt.Printf("draw %d: %v | ", drawNo+1, draw)
-		// }
+	// Part 2
+	// The power of a set of cubes is equal to the numbers of red, green, and blue cubes multiplied together.
+	// For each game, find the minimum set of cubes that must have been present. What is the sum of the power of these sets?
+
+	for _, draws := range *allGames {
 		maxPossibleDraw := maxDraw(draws...)
-		// fmt.Printf("max: %v\n", maxPossibleDraw)
-		if limit.contains(maxPossibleDraw) {
-			sum += gameNo + 1
-		}
+		sum += maxPossibleDraw.Power()
+
+		// if limit.contains(maxPossibleDraw) {
+		// 	sum += gameNo + 1
+		// }
 	}
 	fmt.Println("Sum", sum)
 }

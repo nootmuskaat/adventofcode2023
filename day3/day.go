@@ -14,14 +14,41 @@ func Main() {
 	values, symbols := whatIsWhere(readFile())
 
 	var sum uint
-	for _, symbol := range *symbols {
+
+	// Part 1
+	// Any number adjacent to a symbol, even diagonally, is a "part number"
+	// (Periods (.) do not count as a symbol.)
+	// What is the sum of all of the part numbers in the engine schematic?
+
+	// for _, symbol := range *symbols {
+	// 	for _, value := range *values {
+	// 		if symbol.Neighbors(&value) && !value.relevant {
+	// 			value.relevant = true
+	// 			sum += value.value
+	// 		}
+	// 	}
+	// }
+
+	// Part 2
+	// A gear is any * symbol that is adjacent to exactly two part numbers.
+	// Its gear ratio is the result of multiplying those two numbers together.
+	// What is the sum of all of the gear ratios in your engine schematic?
+	neighbors := make(map[Point][]Value)
+
+	for _, gear := range *symbols {
 		for _, value := range *values {
-			if symbol.Neighbors(&value) && !value.relevant {
-				value.relevant = true
-				sum += value.value
+			if gear.Neighbors(&value) {
+				neighbors[gear] = append(neighbors[gear], value)
 			}
 		}
 	}
+
+	for _, values := range neighbors {
+		if len(values) == 2 {
+			sum += values[0].value * values[1].value
+		}
+	}
+
 	fmt.Println("Sum", sum)
 }
 
@@ -85,7 +112,8 @@ func whatIsWhere(lines *[]string) (*[]Value, *[]Point) {
 					values = append(values, NewValue(value, starting))
 					value = 0
 				}
-				if chr != '.' {
+				// if chr != '.' {  // Part 1 version
+				if chr == '*' { // Part 2 version
 					symbols = append(symbols, Point{int16(x), int16(y)})
 				}
 			}

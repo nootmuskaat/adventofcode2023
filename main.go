@@ -2,9 +2,10 @@ package main
 
 import (
 	// day1 "nootmuskaat/adventofcode2023/day1"
-	day2 "nootmuskaat/adventofcode2023/day2"
+	// day2 "nootmuskaat/adventofcode2023/day2"
+	day3 "nootmuskaat/adventofcode2023/day3"
 )
 
 func main() {
-	day2.Main()
+	day3.Main()
 }

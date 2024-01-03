@@ -80,7 +80,12 @@ func firstInt(line *string) int {
 			break
 		}
 	}
-	prefix := (*line)[:numeral_idx]
+	var prefix string
+	if numeral_idx == -1 {
+		prefix = *line
+	} else {
+		prefix = (*line)[:numeral_idx]
+	}
 	if first_string := firstString(prefix); first_string != -1 {
 		numeral = first_string
 	}

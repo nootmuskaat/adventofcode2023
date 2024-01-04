@@ -39,26 +39,30 @@ func maxDraw(draws ...Draw) *Draw {
 	return &combined
 }
 
-func Main() {
+func Main(part2 bool) {
 	allGames := readGames()
-
-	// Part 1
-	// Determine which games would have been possible if the bag had been loaded with only
-	// 12 red cubes, 13 green cubes, and 14 blue cubes. What is the sum of the IDs of those games?
-	// limit := Draw{12, 13, 14}
 	var sum uint64
 
-	// Part 2
-	// The power of a set of cubes is equal to the numbers of red, green, and blue cubes multiplied together.
-	// For each game, find the minimum set of cubes that must have been present. What is the sum of the power of these sets?
+	if !part2 {
+		// Part 1
+		// Determine which games would have been possible if the bag had been loaded with only
+		// 12 red cubes, 13 green cubes, and 14 blue cubes. What is the sum of the IDs of those games?
+		limit := Draw{12, 13, 14}
+		for gameNo, draws := range *allGames {
+			maxPossibleDraw := maxDraw(draws...)
+			if limit.contains(maxPossibleDraw) {
+				sum += uint64(gameNo + 1)
+			}
+		}
 
-	for _, draws := range *allGames {
-		maxPossibleDraw := maxDraw(draws...)
-		sum += maxPossibleDraw.Power()
-
-		// if limit.contains(maxPossibleDraw) {
-		// 	sum += gameNo + 1
-		// }
+	} else {
+		// Part 2
+		// The power of a set of cubes is equal to the numbers of red, green, and blue cubes multiplied together.
+		// For each game, find the minimum set of cubes that must have been present. What is the sum of the power of these sets?
+		for _, draws := range *allGames {
+			maxPossibleDraw := maxDraw(draws...)
+			sum += maxPossibleDraw.Power()
+		}
 	}
 	fmt.Println("Sum", sum)
 }

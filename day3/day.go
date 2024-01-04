@@ -10,42 +10,45 @@ import (
 
 const DAY3_FILE = "./static/day3.txt"
 
-func Main() {
-	values, symbols := whatIsWhere(readFile())
+func Main(onlyGears bool) {
+	values, symbols := whatIsWhere(readFile(), onlyGears)
 
 	var sum uint
 
-	// Part 1
-	// Any number adjacent to a symbol, even diagonally, is a "part number"
-	// (Periods (.) do not count as a symbol.)
-	// What is the sum of all of the part numbers in the engine schematic?
+	if !onlyGears {
+		// Part 1
+		// Any number adjacent to a symbol, even diagonally, is a "part number"
+		// (Periods (.) do not count as a symbol.)
+		// What is the sum of all of the part numbers in the engine schematic?
 
-	// for _, symbol := range *symbols {
-	// 	for _, value := range *values {
-	// 		if symbol.Neighbors(&value) && !value.relevant {
-	// 			value.relevant = true
-	// 			sum += value.value
-	// 		}
-	// 	}
-	// }
-
-	// Part 2
-	// A gear is any * symbol that is adjacent to exactly two part numbers.
-	// Its gear ratio is the result of multiplying those two numbers together.
-	// What is the sum of all of the gear ratios in your engine schematic?
-	neighbors := make(map[Point][]Value)
-
-	for _, gear := range *symbols {
-		for _, value := range *values {
-			if gear.Neighbors(&value) {
-				neighbors[gear] = append(neighbors[gear], value)
+		for _, symbol := range *symbols {
+			for _, value := range *values {
+				if symbol.Neighbors(&value) && !value.relevant {
+					value.relevant = true
+					sum += value.value
+				}
 			}
 		}
-	}
+	} else {
 
-	for _, values := range neighbors {
-		if len(values) == 2 {
-			sum += values[0].value * values[1].value
+		// Part 2
+		// A gear is any * symbol that is adjacent to exactly two part numbers.
+		// Its gear ratio is the result of multiplying those two numbers together.
+		// What is the sum of all of the gear ratios in your engine schematic?
+		neighbors := make(map[Point][]Value)
+
+		for _, gear := range *symbols {
+			for _, value := range *values {
+				if gear.Neighbors(&value) {
+					neighbors[gear] = append(neighbors[gear], value)
+				}
+			}
+		}
+
+		for _, values := range neighbors {
+			if len(values) == 2 {
+				sum += values[0].value * values[1].value
+			}
 		}
 	}
 
@@ -87,7 +90,7 @@ func (p Point) Neighbors(value *Value) bool {
 
 // Build a mapping of what numerical values are where
 // and what non-. symbols are where
-func whatIsWhere(lines *[]string) (*[]Value, *[]Point) {
+func whatIsWhere(lines *[]string, onlyGears bool) (*[]Value, *[]Point) {
 	values := make([]Value, 0, 16)
 	symbols := make([]Point, 0, 16)
 
@@ -112,8 +115,8 @@ func whatIsWhere(lines *[]string) (*[]Value, *[]Point) {
 					values = append(values, NewValue(value, starting))
 					value = 0
 				}
-				// if chr != '.' {  // Part 1 version
-				if chr == '*' { // Part 2 version
+				if (onlyGears && chr == '*') /* Part 2 version */ ||
+					!onlyGears && chr != '.' /* Part 1 version */ {
 					symbols = append(symbols, Point{int16(x), int16(y)})
 				}
 			}

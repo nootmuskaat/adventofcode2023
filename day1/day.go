@@ -25,7 +25,7 @@ var NUMBERS_AS_TEXT = map[string]int{
 	"nine":  9,
 }
 
-func Main() {
+func Main(includeStrings bool) {
 	f, err := os.Open(DAY1_FILE)
 	if err != nil {
 		log.Fatal(err)
@@ -41,7 +41,7 @@ func Main() {
 		if err := scanner.Err(); err != nil {
 			log.Fatal(err)
 		}
-		line_value = 10*firstInt(&line) + lastInt(&line)
+		line_value = 10*firstInt(&line, includeStrings) + lastInt(&line, includeStrings)
 		// log.Printf("Line %s yielded value %d", line, line_value)
 		sum += line_value
 	}
@@ -72,7 +72,7 @@ func lastString(line string) int {
 }
 
 // Locate the first integer in the string
-func firstInt(line *string) int {
+func firstInt(line *string, includeStrings bool) int {
 	numeral, numeral_idx := 0, -1
 	for idx, chr := range *line {
 		if unicode.IsDigit(chr) {
@@ -81,6 +81,9 @@ func firstInt(line *string) int {
 		}
 	}
 	var prefix string
+	if !includeStrings {
+		return numeral
+	}
 	if numeral_idx == -1 {
 		prefix = *line
 	} else {
@@ -93,7 +96,7 @@ func firstInt(line *string) int {
 }
 
 // Locate the last integer in the string
-func lastInt(line *string) int {
+func lastInt(line *string, includeStrings bool) int {
 	numeral, numeral_idx := 0, 0
 	var chr rune
 	for idx := len(*line) - 1; idx >= 0; idx-- {
@@ -102,6 +105,9 @@ func lastInt(line *string) int {
 			numeral, numeral_idx = int(chr-ZERO), idx
 			break
 		}
+	}
+	if !includeStrings {
+		return numeral
 	}
 	suffix := (*line)[numeral_idx:]
 	if last_string := lastString(suffix); last_string != -1 {

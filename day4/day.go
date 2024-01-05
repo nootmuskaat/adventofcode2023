@@ -15,15 +15,18 @@ const FILENAME = "./static/day4.txt"
 func Main(part2 bool) {
 	lines := readFile(FILENAME)
 	var sum uint
-	for lineNo, line := range *lines {
-		if lineNo < 10 {
-			log.Printf("%d:%s", lineNo, line)
-		}
-		if len(line) == 0 {
-			continue
-		}
+	count := make(map[int]uint)
+	for cardNo, line := range *lines {
 		scratchCard := NewScratchCard(&line)
-		sum += scratchCard.Points()
+		if !part2 {
+			sum += scratchCard.Points()
+		} else {
+			count[cardNo]++
+			for i, m := 1, scratchCard.Matches(); i <= m; i++ {
+				count[cardNo+i] += count[cardNo]
+			}
+			sum += count[cardNo]
+		}
 	}
 	log.Println("Sum:", sum)
 }
@@ -33,16 +36,19 @@ type ScratchCard struct {
 	scratchValues *mapset.Set[uint8]
 }
 
-func (sc ScratchCard) Points() uint {
+func (sc ScratchCard) Matches() int {
 	winners := *sc.winningValues
 	scratched := *sc.scratchValues
 	matches := winners.Intersect(scratched)
-	log.Printf("%v & %v -> %v\n", winners, scratched, matches)
-	if matches.IsEmpty() {
-		return 0
-	}
+	return matches.Cardinality()
+}
 
-	return uint(math.Pow(2.0, float64(matches.Cardinality()-1)))
+func (sc ScratchCard) Points() uint {
+	if matches := sc.Matches(); matches == 0 {
+		return 0
+	} else {
+		return uint(math.Pow(2.0, float64(matches-1)))
+	}
 }
 
 func NewScratchCard(line *string) *ScratchCard {

@@ -13,51 +13,92 @@ import (
 const FILENAME = "./static/day5.txt"
 const MaxUint = ^uint(0)
 
+var fieldOrder []string = []string{
+	"seed", "soil", "fertilizer", "water", "light", "temperature", "humidity", "location",
+}
+
 func Main(part2 bool) {
 	seeds, maps := readFile(FILENAME)
+	location := MaxUint
+
 	if !part2 {
 		// Part 1
 		// What is the lowest location number that corresponds to any of the initial seed numbers?
 		// you'll need to convert each seed number through other categories until you can find its
 		// corresponding location number. In this example, the corresponding types are:
 		// Seed 79->soil 81->fertilizer 81->water 81->light 74->temperature 78->humidity 78->location 82.
-		var lowest uint = MaxUint
-		order := []string{
-			"seed", "soil", "fertilizer", "water", "light", "temperature", "humidity", "location",
-		}
 		for _, val := range seeds {
-			for idx, factor := range order {
-				if idx == 0 {
-					continue
-				}
-				key := fmt.Sprintf("%s-to-%s", order[idx-1], factor)
-				val = maps[key].Map(val)
-			}
-			if val < lowest {
-				lowest = val
+			val = RunForwards(val, &maps)
+			if val < location {
+				location = val
 			}
 		}
-		log.Println("Lowest:", lowest)
+	} else {
+		seedRanges := FullRange{}
+		for i, j := 0, 1; i < len(seeds); {
+			seedRanges.Append(Range{seeds[i], seeds[i], seeds[j]})
+			i, j = i+2, j+2
+		}
+		location = 0
+		factor := uint(10000)
+		// hone in on target value one order of magnitude at a time
+		for {
+			if seedVal := RunBackwards(location, &maps); seedRanges.Contains(seedVal) {
+				if factor == 1 {
+					break
+				} else {
+					location -= factor
+					factor /= 10
+				}
+			}
+			location += factor
+		}
 	}
-
+	log.Println("Lowest:", location)
 }
 
-type Todo struct {
+func RunForwards(num uint, maps *map[string]FullRange) uint {
+	for idx, factor := range fieldOrder[1:] {
+		key := fmt.Sprintf("%s-to-%s", fieldOrder[idx], factor)
+		num = (*maps)[key].Map(num)
+	}
+	return num
+}
+
+func RunBackwards(num uint, maps *map[string]FullRange) uint {
+	for i := len(fieldOrder) - 1; i > 0; i-- {
+		// fmt.Printf("%d\t->\t", val)
+		key := fmt.Sprintf("%s-to-%s", fieldOrder[i-1], fieldOrder[i])
+		num = (*maps)[key].ReverseMap(num)
+		// fmt.Printf("%s\t->\t%d\n", key, val)
+	}
+	return num
 }
 
 type Range struct {
 	dest, source, length uint
 }
 
-func (r Range) contains(num uint) bool {
+func (r Range) Contains(num uint) bool {
 	return num >= r.source && num < (r.source+r.length)
 }
 
+func (r Range) ReverseContains(num uint) bool {
+	return num >= r.dest && num < (r.dest+r.length)
+}
+
 func (r Range) Map(num uint) (uint, error) {
-	if !r.contains(num) {
+	if !r.Contains(num) {
 		return 0, errors.New("Num not in range")
 	}
 	return r.dest + (num - r.source), nil
+}
+
+func (r Range) ReverseMap(num uint) (uint, error) {
+	if !r.ReverseContains(num) {
+		return 0, errors.New("Num not in range")
+	}
+	return r.source + (num - r.dest), nil
 }
 
 func RangeFromLine(s *string) (Range, error) {
@@ -81,9 +122,31 @@ type FullRange struct {
 	ranges []Range
 }
 
+func (fr *FullRange) Append(r Range) {
+	fr.ranges = append(fr.ranges, r)
+}
+
+func (fr FullRange) Contains(num uint) bool {
+	for _, r := range fr.ranges {
+		if r.Contains(num) {
+			return true
+		}
+	}
+	return false
+}
+
 func (fr FullRange) Map(num uint) uint {
 	for _, r := range fr.ranges {
 		if n, err := r.Map(num); err == nil {
+			return n
+		}
+	}
+	return num
+}
+
+func (fr FullRange) ReverseMap(num uint) uint {
+	for _, r := range fr.ranges {
+		if n, err := r.ReverseMap(num); err == nil {
 			return n
 		}
 	}
@@ -119,7 +182,7 @@ func readFile(filename string) ([]uint, map[string]FullRange) {
 			if r, e := RangeFromLine(&line); e != nil {
 				log.Fatalln(e)
 			} else {
-				fr.ranges = append(fr.ranges, r)
+				fr.Append(r)
 			}
 		}
 	}

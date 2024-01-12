@@ -12,10 +12,14 @@ import (
 
 const FILENAME = "./static/day7.txt"
 
-func Main(part2 bool) {
+func Main(jokers bool) {
 	hands := readFile(FILENAME)
 
-	slices.SortFunc(*hands, compareHands)
+	if jokers {
+		slices.SortFunc(*hands, compareHandsWithJokers)
+	} else {
+		slices.SortFunc(*hands, compareHands)
+	}
 
 	scores := 0
 	for rank, hand := range *hands {
@@ -29,6 +33,14 @@ type Hand struct {
 	wager int
 }
 
+func compareHandsWithJokers(a, b Hand) int {
+	byType := cmp.Compare(identifyHandWithJokers(&a.cards), identifyHandWithJokers(&b.cards))
+	if byType != 0 {
+		return byType
+	}
+	return cmp.Compare(cardsToIntWithJokers(&a.cards), cardsToIntWithJokers(&b.cards))
+}
+
 func compareHands(a, b Hand) int {
 	byType := cmp.Compare(identifyHand(&a.cards), identifyHand(&b.cards))
 	if byType != 0 {
@@ -37,18 +49,23 @@ func compareHands(a, b Hand) int {
 	return cmp.Compare(cardsToInt(&a.cards), cardsToInt(&b.cards))
 }
 
+const cardOrder = "23456789TJQKA"
+const jokerOrder = "J23456789TQKA"
+
 func cardsToInt(cards *string) int {
 	val := 0
 	for _, card := range *cards {
-		val = (val << 4) + cardToInt(card)
+		val = (val << 4) + strings.IndexRune(cardOrder, card)
 	}
 	return val
 }
 
-const cardOrder = "23456789TJQKA"
-
-func cardToInt(card rune) int {
-	return strings.IndexRune(cardOrder, card)
+func cardsToIntWithJokers(cards *string) int {
+	val := 0
+	for _, card := range *cards {
+		val = (val << 4) + strings.IndexRune(jokerOrder, card)
+	}
+	return val
 }
 
 type HandType int8
@@ -63,11 +80,39 @@ const (
 	FIVE_OF_A_KIND
 )
 
+func identifyHandWithJokers(cards *string) HandType {
+	count := make(map[rune]int8)
+	for _, card := range *cards {
+		count[card]++
+	}
+	if jokers, ok := count['J']; ok {
+		delete(count, 'J')
+		actAs := keyWithMost(count)
+		count[actAs] += jokers
+
+	}
+	return identifyHandFromCount(count)
+}
+
+func keyWithMost(count map[rune]int8) rune {
+	mostK, mostV := 'J', int8(0)
+	for k, v := range count {
+		if v > mostV {
+			mostK, mostV = k, v
+		}
+	}
+	return mostK
+}
+
 func identifyHand(cards *string) HandType {
 	count := make(map[rune]int8)
 	for _, card := range *cards {
 		count[card]++
 	}
+	return identifyHandFromCount(count)
+}
+
+func identifyHandFromCount(count map[rune]int8) HandType {
 	switch len(count) {
 	case 1:
 		return FIVE_OF_A_KIND

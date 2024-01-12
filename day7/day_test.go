@@ -57,6 +57,32 @@ func TestIdentifyHand(t *testing.T) {
 	}
 }
 
+func TestIdentifyHandWithJokers(t *testing.T) {
+	testCases := []struct {
+		cards    string
+		expected HandType
+	}{
+		{"32T3K", ONE_PAIR},
+		{"T55J5", FOUR_OF_A_KIND},
+		{"KK677", TWO_PAIR},
+		{"KTJJT", FOUR_OF_A_KIND},
+		{"QQQJA", FOUR_OF_A_KIND},
+		{"3245J", ONE_PAIR},
+		{"324JJ", THREE_OF_A_KIND},
+		{"3JJJJ", FIVE_OF_A_KIND},
+	}
+
+	for _, tc := range testCases {
+		testName := fmt.Sprintf("identifyHand(%s)->%d", tc.cards, tc.expected)
+		t.Run(testName, func(t *testing.T) {
+			got := identifyHandWithJokers(&tc.cards)
+			if got != tc.expected {
+				t.Errorf("Got %d expected %d", got, tc.expected)
+			}
+		})
+	}
+}
+
 func TestCardsToInt(t *testing.T) {
 	testCases := []struct {
 		cards    string

@@ -10,6 +10,7 @@ import (
 	day4 "nootmuskaat/adventofcode2023/day4"
 	day5 "nootmuskaat/adventofcode2023/day5"
 	day6 "nootmuskaat/adventofcode2023/day6"
+	day7 "nootmuskaat/adventofcode2023/day7"
 )
 
 func main() {
@@ -20,6 +21,7 @@ func main() {
 		4: day4.Main,
 		5: day5.Main,
 		6: day6.Main,
+		7: day7.Main,
 	}
 
 	day := flag.Uint("day", uint(len(days)), "The day to run")

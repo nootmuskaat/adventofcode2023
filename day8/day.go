@@ -11,25 +11,88 @@ const FILENAME = "./static/day8.txt"
 
 func Main(part2 bool) {
 	inst, whereTo := readFile(FILENAME)
-	vals, done := Instructor(inst)
-	where := Location("AAA")
-	destination := Location("ZZZ")
 	steps := 0
-	for {
-		steps += 1
-		switch <-vals {
-		case 'L':
-			where = whereTo[where].left
-		case 'R':
-			where = whereTo[where].right
+	if !part2 {
+		vals, done := Instructor(inst)
+		where := Location("AAA")
+		destination := Location("ZZZ")
+		for {
+			steps += 1
+			switch <-vals {
+			case 'L':
+				where = whereTo[where].left
+			case 'R':
+				where = whereTo[where].right
+			}
+			if where == destination {
+				done <- true
+				close(done)
+				break
+			}
 		}
-		if where == destination {
-			done <- true
-			close(done)
-			break
+	} else {
+		starts := startingPoints(&whereTo)
+		stepChans := make([]chan bool, 0, len(starts))
+		arrChans := make([]chan bool, 0, len(starts))
+
+		for _, startFrom := range starts {
+			takeStep := make(chan bool)
+			hasArrived := make(chan bool)
+
+			go func(where Location, step <-chan bool, arrived chan<- bool) {
+				log.Printf("Starting gorouting starting at %s", where)
+
+				vals, done := Instructor(inst)
+				for <- step {
+					switch <-vals {
+					case 'L':
+						where = whereTo[where].left
+					case 'R':
+						where = whereTo[where].right
+					}
+					arrived <- where[2] == 'Z'
+				}
+				done <- true
+				close(done)
+				close(arrived)
+			}(startFrom, takeStep, hasArrived)
+
+			stepChans = append(stepChans, takeStep)
+			arrChans = append(arrChans, hasArrived)
+		}
+
+		for {
+			steps += 1
+			allArrived := true
+
+			for i, takeStep := range stepChans {
+				takeStep <- true
+				hm := <- arrChans[i]
+				// if hm {
+				// 	log.Println("Goroutine", i, "has arrived after", steps)
+				// }
+				allArrived = allArrived && hm
+			}
+			if allArrived {
+				for _, takeStep := range stepChans {
+					takeStep <- false
+					close(takeStep)
+				}
+				break
+			}
 		}
 	}
 	log.Println("Arrived after", steps)
+}
+
+func startingPoints(m *map[Location]SignPost) []Location {
+	starts := make([]Location, 0, 8)
+	for l := range *m {
+		if l[2] == 'A' {
+			starts = append(starts, l)
+		}
+	}
+	return starts
 }
 
 func Instructor(s string) (chan rune, chan bool) {

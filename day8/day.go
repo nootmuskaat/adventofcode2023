@@ -32,57 +32,93 @@ func Main(part2 bool) {
 		}
 	} else {
 		starts := startingPoints(&whereTo)
-		stepChans := make([]chan bool, 0, len(starts))
-		arrChans := make([]chan bool, 0, len(starts))
+		isDone := make(chan bool)
+		loops := make([]Loop, len(starts))
 
-		for _, startFrom := range starts {
-			takeStep := make(chan bool)
-			hasArrived := make(chan bool)
-
-			go func(where Location, step <-chan bool, arrived chan<- bool) {
-				log.Printf("Starting gorouting starting at %s", where)
-
-				vals, done := Instructor(inst)
-				for <- step {
-					switch <-vals {
-					case 'L':
-						where = whereTo[where].left
-					case 'R':
-						where = whereTo[where].right
-					}
-					arrived <- where[2] == 'Z'
-				}
-				done <- true
-				close(done)
-				close(arrived)
-			}(startFrom, takeStep, hasArrived)
-
-			stepChans = append(stepChans, takeStep)
-			arrChans = append(arrChans, hasArrived)
+		for i, startFrom := range starts {
+			loops[i] = Loop{0, []int{}}
+			go findLoop(inst, startFrom, &whereTo, &loops[i], isDone)
 		}
-
-		for {
-			steps += 1
-			allArrived := true
-
-			for i, takeStep := range stepChans {
-				takeStep <- true
-				hm := <- arrChans[i]
-				// if hm {
-				// 	log.Println("Goroutine", i, "has arrived after", steps)
-				// }
-				allArrived = allArrived && hm
-			}
-			if allArrived {
-				for _, takeStep := range stepChans {
-					takeStep <- false
-					close(takeStep)
-				}
-				break
-			}
+		for range starts {
+			<-isDone
 		}
+		lens := make([]int, len(starts))
+		// from earlier testing, I know that each loop has one endpoint which is
+		// equal to the length of the loop
+		for i, l := range loops {
+			lens[i] = l.length
+		}
+		steps = lcm(lens[0], lens[1], lens[2:]...)
 	}
 	log.Println("Arrived after", steps)
+}
+
+func findLoop(inst string, startPoint Location, whereTo *map[Location]SignPost, loop *Loop, done chan bool) {
+	vals, stopIter := Instructor(inst)
+	secondaryCheck := make(map[LoopPoint]int)
+	arrivals := make([]int, 0, 8)
+	current := startPoint
+
+	steps := 0
+	for ; ; steps++ {
+		if (steps%len(inst)) == 0 && current == startPoint && steps > 0 {
+			break
+		}
+		switch <-vals {
+		case 'L':
+			current = (*whereTo)[current].left
+		case 'R':
+			current = (*whereTo)[current].right
+		}
+		if current[2] == 'Z' {
+			lp := LoopPoint{current, steps % len(inst)}
+			if secondaryCheck[lp] > 0 {
+				steps -= secondaryCheck[lp]
+				break
+			}
+			secondaryCheck[lp] = steps
+			arrivals = append(arrivals, steps+1)
+		}
+	}
+	stopIter <- true
+	close(stopIter)
+	*loop = Loop{steps, arrivals}
+	done <- true
+}
+
+func gcd(a, b int, o ...int) int {
+	if len(o) > 0 {
+		return gcd(a, gcd(b, o[0], o[1:]...))
+	}
+	for a != b {
+		if a > b {
+			a -= b
+		} else {
+			b -= a
+		}
+	}
+	return a
+}
+
+func lcm(a, b int, o ...int) int {
+	if len(o) > 0 {
+		return lcm(a, lcm(b, o[0], o[1:]...))
+	}
+	if a > b {
+		return (a / gcd(a, b)) * b
+	} else {
+		return (b / gcd(a, b)) * a
+	}
+}
+
+type LoopPoint struct {
+	location Location
+	when     int
+}
+
+type Loop struct {
+	length    int
+	endpoints []int
 }
 
 func startingPoints(m *map[Location]SignPost) []Location {

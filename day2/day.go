@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-const DAY2_FILE = "./static/day2.txt"
-
 type Draw struct {
 	red, green, blue uint64
 }
@@ -39,8 +37,8 @@ func maxDraw(draws ...Draw) *Draw {
 	return &combined
 }
 
-func Main(part2 bool) {
-	allGames := readGames()
+func Main(f *os.File, part2 bool) {
+	allGames := readGames(f)
 	var sum uint64
 
 	if !part2 {
@@ -67,14 +65,8 @@ func Main(part2 bool) {
 	fmt.Println("Sum", sum)
 }
 
-func readGames() *[][]Draw {
+func readGames(f *os.File) *[][]Draw {
 	games := make([][]Draw, 0, 100)
-
-	f, err := os.Open(DAY2_FILE)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {

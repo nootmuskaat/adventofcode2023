@@ -8,10 +8,8 @@ import (
 	"os"
 )
 
-const DAY3_FILE = "./static/day3.txt"
-
-func Main(onlyGears bool) {
-	values, symbols := whatIsWhere(readFile(), onlyGears)
+func Main(f *os.File, onlyGears bool) {
+	values, symbols := whatIsWhere(readFile(f), onlyGears)
 
 	var sum uint
 
@@ -126,11 +124,7 @@ func whatIsWhere(lines *[]string, onlyGears bool) (*[]Value, *[]Point) {
 
 }
 
-func readFile() *[]string {
-	f, err := os.Open(DAY3_FILE)
-	if err != nil {
-		log.Fatal(err)
-	}
+func readFile(f *os.File) *[]string {
 	lines := make([]string, 0)
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {

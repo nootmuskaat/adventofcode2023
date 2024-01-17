@@ -7,10 +7,8 @@ import (
 	"regexp"
 )
 
-const FILENAME = "./static/day8.txt"
-
-func Main(part2 bool) {
-	inst, whereTo := readFile(FILENAME)
+func Main(f *os.File, part2 bool) {
+	inst, whereTo := readFile(f)
 	steps := 0
 	if !part2 {
 		vals, done := Instructor(inst)
@@ -166,13 +164,7 @@ func readLine(s string) (Location, SignPost) {
 	return Location(m[1]), SignPost{Location(m[2]), Location(m[3])}
 }
 
-func readFile(filename string) (string, map[Location]SignPost) {
-	f, err := os.Open(filename)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer f.Close()
-
+func readFile(f *os.File) (string, map[Location]SignPost) {
 	var inst string
 	whereTo := make(map[Location]SignPost)
 

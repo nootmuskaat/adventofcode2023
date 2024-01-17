@@ -1,16 +1,16 @@
 package day6
 
 import (
+	"errors"
+	"io"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 )
 
-const FILENAME = "./static/day6.txt"
-
-func Main(part2 bool) {
-	races := readFile(FILENAME, part2)
+func Main(f *os.File, part2 bool) {
+	races := readFile(f, part2)
 	allWinningWays := uint(1)
 	for _, race := range races {
 		winningWays := uint(0)
@@ -28,15 +28,17 @@ type Race struct {
 	time, distance uint
 }
 
-func readFile(filename string, joinInts bool) []Race {
+func readFile(f *os.File, joinInts bool) []Race {
 	races := make([]Race, 0, 4)
 	times := make([]uint, 0, 4)
 	distances := make([]uint, 0, 4)
 
-	contents, err := os.ReadFile(filename)
-	if err != nil {
-		log.Fatalln(err)
+	contents := make([]byte, 1024)
+	_, err := f.Read(contents)
+	if err != nil && !errors.Is(err, io.EOF) {
+		panic(err)
 	}
+
 	lines := strings.Split(string(contents), "\n")
 	for _, i := range strings.Split(lines[0], " ")[1:] {
 		if len(i) == 0 {

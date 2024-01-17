@@ -10,10 +10,8 @@ import (
 	"strings"
 )
 
-const FILENAME = "./static/day7.txt"
-
-func Main(jokers bool) {
-	hands := readFile(FILENAME)
+func Main(f *os.File, jokers bool) {
+	hands := readFile(f)
 
 	if jokers {
 		slices.SortFunc(*hands, compareHandsWithJokers)
@@ -139,12 +137,7 @@ func identifyHandFromCount(count map[rune]int8) HandType {
 	return 0
 }
 
-func readFile(filename string) *[]Hand {
-	f, err := os.Open(filename)
-	if err != nil {
-		slog.Error("Cannot open file", "error", err)
-	}
-	defer f.Close()
+func readFile(f *os.File) *[]Hand {
 	scanner := bufio.NewScanner(f)
 
 	hands := make([]Hand, 0, 64)

@@ -10,15 +10,14 @@ import (
 	"strings"
 )
 
-const FILENAME = "./static/day5.txt"
 const MaxUint = ^uint(0)
 
 var fieldOrder []string = []string{
 	"seed", "soil", "fertilizer", "water", "light", "temperature", "humidity", "location",
 }
 
-func Main(part2 bool) {
-	seeds, maps := readFile(FILENAME)
+func Main(f *os.File, part2 bool) {
+	seeds, maps := readFile(f)
 	location := MaxUint
 
 	if !part2 {
@@ -153,12 +152,7 @@ func (fr FullRange) ReverseMap(num uint) uint {
 	return num
 }
 
-func readFile(filename string) ([]uint, map[string]FullRange) {
-	f, err := os.Open(filename)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer f.Close()
+func readFile(f *os.File) ([]uint, map[string]FullRange) {
 	seeds := make([]uint, 0, 16)
 	ranges := make(map[string]FullRange)
 	key := ""

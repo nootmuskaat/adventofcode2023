@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 
 	day1 "nootmuskaat/adventofcode2023/day1"
 	day2 "nootmuskaat/adventofcode2023/day2"
@@ -15,7 +16,7 @@ import (
 )
 
 func main() {
-	days := map[uint]func(bool){
+	days := map[uint]func(*os.File, bool){
 		1: day1.Main,
 		2: day2.Main,
 		3: day3.Main,
@@ -28,9 +29,20 @@ func main() {
 
 	day := flag.Uint("day", uint(len(days)), "The day to run")
 	isPartTwo := flag.Bool("part2", false, "If true, run the second part of the day's task")
+	filename := flag.String("f", "", "File to use, if not './static/day${dayNumber}.txt'")
 	flag.Parse()
 
-	fmt.Printf("Running day %d - part two %v\n", *day, *isPartTwo)
+	if len(*filename) == 0 {
+		*filename = fmt.Sprintf("./static/day%d.txt", *day)
+	}
 
-	days[*day](*isPartTwo)
+	f, err := os.Open(*filename)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	fmt.Printf("Running day %d (%s) - part two %v\n", *day, *filename, *isPartTwo)
+
+	days[*day](f, *isPartTwo)
 }

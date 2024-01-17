@@ -10,10 +10,8 @@ import (
 	"strings"
 )
 
-const FILENAME = "./static/day4.txt"
-
-func Main(part2 bool) {
-	lines := readFile(FILENAME)
+func Main(f *os.File, part2 bool) {
+	lines := readFile(f)
 	var sum uint
 	count := make(map[int]uint)
 	for cardNo, line := range *lines {
@@ -80,12 +78,7 @@ func asUintSet(s string) *mapset.Set[uint8] {
 	return &values
 }
 
-func readFile(filename string) *[]string {
-	f, err := os.Open(filename)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+func readFile(f *os.File) *[]string {
 	lines := make([]string, 0, 16)
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {

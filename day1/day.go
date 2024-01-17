@@ -8,7 +8,6 @@ import (
 	"unicode"
 )
 
-const DAY1_FILE = "static/day1.txt"
 const ZERO = '0'
 
 // golang does not allow this to be const
@@ -25,12 +24,7 @@ var NUMBERS_AS_TEXT = map[string]int{
 	"nine":  9,
 }
 
-func Main(includeStrings bool) {
-	f, err := os.Open(DAY1_FILE)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
+func Main(f *os.File, includeStrings bool) {
 	scanner := bufio.NewScanner(f)
 
 	sum := 0

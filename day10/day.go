@@ -1,26 +1,63 @@
 package day10
 
 import (
-	"os"
-	"strings"
+	"bufio"
 	"fmt"
+	"os"
+	"slices"
+	"strings"
+	"sync"
+	"time"
 )
 
 func Main(f *os.File, part2 bool) {
+	terrain := readFile(f)
+	furthest := 0
+	distances := measureDistances(terrain)
+	for _, row := range distances {
+		furthest = max(furthest, slices.Max(row))
+	}
+	fmt.Println("Furthest point:", furthest)
 }
 
-func measureDistances(lines *[]string) [][]int {
+type Point struct {
+	x, y int
+}
+
+func (p Point) neighbor(x, y int) Point {
+	return Point{p.x + x, p.y + y}
+}
+
+func measureDistances(lines *[][]rune) [][]int {
 	distances := make([][]int, len(*lines))
-	var startX, startY int
+	var start Point
 	for i, line := range *lines {
 		distances[i] = make([]int, len(line))
-		if s := strings.IndexRune(line, START); s != -1 {
-			startX, startY = s, i
+		if s := slices.Index(line, START); s != -1 {
+			start = Point{s, i}
 		}
 	}
-	connections(lines, &distances, startX, startY)
-	for _, row := range distances {
-		fmt.Println(row)
+	todos := make(chan Point, 4)
+	var wg sync.WaitGroup
+	go connections(lines, &distances, start, todos)
+	exit, done := false, make(chan bool)
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		wg.Wait()
+		done <- true
+	}()
+
+	for !exit {
+		select {
+		case p := <-todos:
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				connections(lines, &distances, p, todos)
+			}()
+		case <-done:
+			exit = true
+		}
 	}
 	return distances
 }
@@ -40,33 +77,33 @@ const (
 	TO_LEFT  = FROM_RIGHT
 )
 
+func connections(lines *[][]rune, dist *[][]int, start Point, todos chan Point) {
+	c := At(lines, start)
+	v := Val(dist, start) + 1
+	directions := []struct {
+		neighbor                  Point
+		connectables, inDirection string
+	}{
+		{start.neighbor(0, -1), FROM_ABOVE, TO_ABOVE},
+		{start.neighbor(1, 0), FROM_RIGHT, TO_RIGHT},
+		{start.neighbor(0, 1), FROM_BELOW, TO_BELOW},
+		{start.neighbor(-1, 0), FROM_LEFT, TO_LEFT},
+	}
 
-func connections(lines *[]string, dist *[][]int, startX, startY int) {
-	c := rune((*lines)[startY][startX])
-	v := (*dist)[startY][startX] + 1
-	if look(TO_ABOVE, c) {
-		if above := At(lines, startX, startY-1); In(FROM_ABOVE, above) {
-			(*dist)[startY-1][startX] = update(v, (*dist)[startY-1][startX])
-		}
-	}
-	if look(TO_RIGHT, c) {
-		if right := At(lines, startX+1, startY); In(FROM_RIGHT, right) {
-			(*dist)[startY][startX+1] = update(v, (*dist)[startY][startX+1])
-		}
-	}
-	if look(TO_BELOW, c) {
-		if below := At(lines, startX, startY+1); In(FROM_BELOW, below) {
-			(*dist)[startY+1][startX] = update(v, (*dist)[startY+1][startX])
-		}
-	}
-	if look(TO_LEFT, c) {
-		if left := At(lines, startX-1, startY); In(FROM_LEFT, left) {
-			(*dist)[startY][startX-1] = update(v, (*dist)[startY][startX-1])
+	for _, nd := range directions {
+		if shouldLook(nd.inDirection, c) {
+			// does the neighboring rune 'connect' to our space
+			if In(nd.connectables, At(lines, nd.neighbor)) {
+
+				if update(dist, nd.neighbor, v) {
+					todos <- nd.neighbor
+				}
+			}
 		}
 	}
 }
 
-func look(s string, r rune) bool {
+func shouldLook(s string, r rune) bool {
 	return In(s, r) || r == START
 }
 
@@ -74,23 +111,47 @@ func In(s string, r rune) bool {
 	return strings.IndexRune(s, r) != -1
 }
 
-func At(lines *[]string, x, y int) rune {
-	if y >= len(*lines) || y < 0 {
+func At(lines *[][]rune, point Point) rune {
+	if point.y >= len(*lines) || point.y < 0 {
 		return '.'
 	}
-	line := (*lines)[y]
-	if x > len(line) || x < 0 {
+	line := (*lines)[point.y]
+	if point.x > len(line) || point.x < 0 {
 		return '.'
 	}
-	r := rune(line[x])
-	fmt.Printf("[%d, %d] rune %c\n", x, y, r)
-	return r
+	return line[point.x]
 }
 
-func update(a, b int) int {
-	if a < b || b == 0 {
-		fmt.Println("Set to", a)
-		return a
+func Val(board *[][]int, point Point) int {
+	if point.y >= len(*board) || point.y < 0 {
+		return -1
 	}
-	return b
+	line := (*board)[point.y]
+	if point.x > len(line) || point.x < 0 {
+		return -1
+	}
+	return line[point.x]
+}
+
+func update(board *[][]int, point Point, v int) bool {
+	current := Val(board, point)
+	if current == 0 || current > v {
+		(*board)[point.y][point.x] = v
+		return true
+	}
+	return false
+}
+
+func readFile(f *os.File) *[][]rune {
+	output := make([][]rune, 0, 64)
+
+	scan := bufio.NewScanner(f)
+	for scan.Scan() {
+		line := scan.Text()
+		if err := scan.Err(); err != nil {
+			panic(err)
+		}
+		output = append(output, []rune(line))
+	}
+	return &output
 }

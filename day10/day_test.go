@@ -97,7 +97,7 @@ func TestInsideOut(t *testing.T) {
 	}
 
 	output := measureDistances(&input)
-	identifyInsideOut(&input, output)
+	identifyOutside(&input, output)
 
 	for _, row := range *output {
 		fmt.Println(row)

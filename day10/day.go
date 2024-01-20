@@ -14,8 +14,12 @@ func Main(f *os.File, part2 bool) {
 	terrain := readFile(f)
 	furthest := 0
 	distances := measureDistances(terrain)
-	for _, row := range distances {
-		furthest = max(furthest, slices.Max(row))
+	if part2 {
+		identifyInsideOut(terrain, distances)
+	} else {
+		for _, row := range *distances {
+			furthest = max(furthest, slices.Max(row))
+		}
 	}
 	fmt.Println("Furthest point:", furthest)
 }
@@ -28,7 +32,58 @@ func (p Point) neighbor(x, y int) Point {
 	return Point{p.x + x, p.y + y}
 }
 
-func measureDistances(lines *[][]rune) [][]int {
+func identifyInsideOut(terrain *[][]rune, distances *[][]int) {
+	setStartTo1(terrain, distances)
+	// candidates := countCandidates(distances)
+	iters := (max(len((*distances)[0]), len(*distances)) / 2) + 1
+	width, height := len((*distances)[0]), len(*distances)
+	for i := 0; i < iters; i++ {
+		for x, v := range (*distances)[i] {
+			if val := Val(distances, Point{x, i - 1}); v == 0 && val == -1 {
+				update(distances, Point{x, i}, -1)
+			}
+		}
+		y := height - i - 1
+		for x, v := range (*distances)[y] {
+			if val := Val(distances, Point{x, height + 1}); v == 0 && val == -1 {
+				update(distances, Point{x, height}, -1)
+			}
+		}
+		for y, row := range *distances {
+			if val := Val(distances, Point{i - 1, y}); row[i] == 0 && val == -1 {
+				update(distances, Point{i, y}, -1)
+			}
+			x := width - i - 1
+			if val := Val(distances, Point{x + 1, y}); row[x] == 0 && val == -1 {
+				update(distances, Point{x, y}, -1)
+			}
+		}
+	}
+}
+
+func countCandidates(distances *[][]int) (candidates int) {
+	for _, row := range *distances {
+		for _, v := range row {
+			if v == 0 {
+				candidates++
+			}
+		}
+	}
+	return
+}
+
+func setStartTo1(terrain *[][]rune, distances *[][]int) {
+	for y, row := range *terrain {
+		for x, r := range row {
+			if r == START {
+				update(distances, Point{x, y}, 1)
+				return
+			}
+		}
+	}
+}
+
+func measureDistances(lines *[][]rune) *[][]int {
 	distances := make([][]int, len(*lines))
 	var start Point
 	for i, line := range *lines {
@@ -59,7 +114,7 @@ func measureDistances(lines *[][]rune) [][]int {
 			exit = true
 		}
 	}
-	return distances
+	return &distances
 }
 
 const START = 'S'
@@ -127,7 +182,7 @@ func Val(board *[][]int, point Point) int {
 		return -1
 	}
 	line := (*board)[point.y]
-	if point.x > len(line) || point.x < 0 {
+	if point.x >= len(line) || point.x < 0 {
 		return -1
 	}
 	return line[point.x]

@@ -10,9 +10,18 @@ import (
 	"time"
 )
 
+
+
 func Main(f *os.File, part2 bool) {
+	display := map[PType]rune {
+		UNKN: ' ',
+		OUTS: 'X',
+		LEKL: '<',
+		LEKR: '>',
+	}
+
+
 	terrain := readFile(f)
-	furthest := 0
 	distances := measureDistances(terrain)
 	if part2 {
 		setStartTo1(terrain, distances)
@@ -20,12 +29,28 @@ func Main(f *os.File, part2 bool) {
 		for changes := 1; changes > 0; {
 			changes = identifyOutside(terrain, typeMap) + findLeakage(terrain, typeMap)
 		}
+		inside := 0
+		for y, row := range *typeMap {
+			for x, t := range row {
+				if t == PIPE {
+					fmt.Printf("%c", (*terrain)[y][x])
+				} else {
+					fmt.Printf("%c", display[t])
+				}
+				if t == UNKN {
+					inside++
+				}
+			}
+			fmt.Println()
+		}
+		fmt.Println("Number of inside points:", inside)
 	} else {
+		furthest := 0
 		for _, row := range *distances {
 			furthest = max(furthest, slices.Max(row))
 		}
+		fmt.Println("Furthest point:", furthest)
 	}
-	fmt.Println("Furthest point:", furthest)
 }
 
 type PType uint8
@@ -33,8 +58,19 @@ type PType uint8
 const (
 	UNKN PType = iota
 	PIPE
-	SEAP
+	LEKL  // left side of leak
+	LEKR  // right side
+	LEKB  // bend if leak, i.e. a fork or elbow
 	OUTS
+)
+
+type Isect uint8
+const (
+	OPEN_NORTH Isect = 1 << 0
+	OPEN_SOUTH       = 1 << 1
+	OPEN_EAST        = 1 << 2
+	OPEN_WEST        = 1 << 3
+	EXTERNAL         = 1 << 4
 )
 
 func convertToTypeMap(distances *[][]int) *[][]PType {
@@ -60,45 +96,174 @@ func (p Point) neighbor(x, y int) Point {
 	return Point{p.x + x, p.y + y}
 }
 
+
+const (
+	CONNECT_EAST string = "LF-S"
+	CONNECT_WEST        = "J7-S"
+	CONNECT_NORTH       = "LJ|S"
+	CONNECT_SOUTH       = "F7|S"
+)
+
+// Moving outside in, mark as LEKL or LEKR any two points where outside can
+// leak beyond the initial parimeter
+// TODO - possibly: implement elbows
 func findLeakage(terrain *[][]rune, typeMap *[][]PType) (changed int) {
-	// TODO!
+	width, height := len((*typeMap)[0]), len(*typeMap)
+	for offset := 0; offset < height; offset++ {
+		bottom := height - offset - 1
+		// top moving down
+		for rx, lx := 0, 1; lx < len((*typeMap)[offset]); rx, lx = lx, lx+1 {
+			rp, lp := Point{rx, offset}, Point{lx, offset}
+			rn, ln := Point{rx, offset-1}, Point{lx, offset-1}
+			if possibleLeak := leakSite(typeMap, lp, rp, ln, rn); !possibleLeak {
+				continue
+			}
+			rChar, lChar := valueAt(terrain, rp, '.'), valueAt(terrain, lp, '.')
+			if In(CONNECT_WEST, lChar) && In(CONNECT_EAST, rChar) {
+				continue
+			}
+			// fmt.Printf("T! LEAK %v %c %v %c\n", lp, lChar, rp, rChar)
+			set(typeMap, rp, LEKR)
+			set(typeMap, lp, LEKL)
+			changed++
+		}
+		// bottom moving up
+		for lx, rx := 0, 1; rx < len((*typeMap)[bottom]); lx, rx = rx, rx+1 {
+			rp, lp := Point{rx, bottom}, Point{lx, bottom}
+			rn, ln := Point{rx, bottom+1}, Point{lx, bottom+1}
+			if possibleLeak := leakSite(typeMap, lp, rp, ln, rn); !possibleLeak {
+				continue
+			}
+			rChar, lChar := valueAt(terrain, rp, '.'), valueAt(terrain, lp, '.')
+			if In(CONNECT_EAST, lChar) && In(CONNECT_WEST, rChar) {
+				continue
+			}
+			// fmt.Printf("B! LEAK %v %c %v %c\n", lp, lChar, rp, rChar)
+			set(typeMap, rp, LEKR)
+			set(typeMap, lp, LEKL)
+			changed++
+		}
+	}
+	for offset := 0; offset < width; offset++ {
+		right := width - offset - 1
+		// left moving right
+		for ly, ry := 0, 1; ry < len(*typeMap); ly, ry = ry, ry+1 {
+			rp, lp := Point{offset, ry}, Point{offset, ly}
+			rn, ln := Point{offset-1, ry}, Point{offset-1, ly}
+			if possibleLeak := leakSite(typeMap, lp, rp, ln, rn); !possibleLeak {
+				continue
+			}
+			rChar, lChar := valueAt(terrain, rp, '.'), valueAt(terrain, lp, '.')
+			if In(CONNECT_SOUTH, lChar) && In(CONNECT_NORTH, rChar) {
+				continue
+			}
+			// fmt.Printf("L! LEAK %v %c %v %c\n", lp, lChar, rp, rChar)
+			set(typeMap, rp, LEKR)
+			set(typeMap, lp, LEKL)
+			changed++
+		}
+		// right moving left
+		for ry, ly := 0, 1; ly < len(*typeMap); ry, ly = ly, ly+1 {
+			rp, lp := Point{right, ry}, Point{right, ly}
+			rn, ln := Point{right+1, ry}, Point{right+1, ly}
+			if possibleLeak := leakSite(typeMap, lp, rp, ln, rn); !possibleLeak {
+				continue
+			}
+			rChar, lChar := valueAt(terrain, rp, '.'), valueAt(terrain, lp, '.')
+			if In(CONNECT_NORTH, lChar) && In(CONNECT_SOUTH, rChar) {
+				continue
+			}
+			// fmt.Printf("R! LEAK %v %c %v %c\n", lp, lChar, rp, rChar)
+			set(typeMap, rp, LEKR)
+			set(typeMap, lp, LEKL)
+			changed++
+		}
+	}
 	return
 }
 
-func identifyOutside(terrain *[][]rune, typeMap *[][]PType) (changed int) {
-	// candidates := countCandidates(distances)
 
-	// Moving outside in, mark as external any point that's currently 0 (undefined)
-	// and whose outside neighbor is -1 (exteranl)
-	iters := max(len((*typeMap)[0]), len(*typeMap)) - 1
+// Examine a 2x2 block of map to determine if a leak is even worth assessing
+// For example, the below set of blocks, evaluated bottom up
+//
+// row A:  F7
+// row B:  ||
+// row C:  J|
+// row D:  .L
+// row E:  ..
+//
+// Assuming the points on row E are determined as external,
+// row C would be determined as a leak potential, due to the left neighbor
+// being an external point. Similarly rows B and A would need to be passed for
+// further evaluation as the points below them would be assessed ultimately as leak
+// points. Row A will ultimately close the loop, but this is evaluated outside this func
+func leakSite(typeMap *[][]PType, leftPoint, rightPoint, leftNeighbor, rightNeighbor Point) bool {
+	// confirm we are looking at pipe elements on both sides
+	rType := valueAt(typeMap, rightPoint, OUTS)
+	lType := valueAt(typeMap, leftPoint, OUTS)
+	if rType != PIPE || lType != PIPE {
+		return false
+	}
+	// confirm that we are at a possible leak point to begin with
+	rNeighType := valueAt(typeMap, rightNeighbor, OUTS)
+	lNeighType := valueAt(typeMap, leftNeighbor, OUTS)
+	return lNeighType == OUTS || rNeighType == OUTS || (lNeighType == LEKL && rNeighType == LEKR)
+	// if p {
+	// 	fmt.Println("Potential leak @", leftPoint, rightPoint)
+	// }
+	// return p
+}
+
+// Moving outside in, mark as external any point that's currently 0 (undefined)
+// and whose outside neighbor is -1 (exteranl)
+func identifyOutside(terrain *[][]rune, typeMap *[][]PType) (changed int) {
+
+	val := func(p Point) PType {
+		return valueAt(typeMap, p, OUTS)
+	}
+
 	width, height := len((*typeMap)[0]), len(*typeMap)
-	for offset := 0; offset < iters; offset++ {
+	for offset := 0; offset < height; offset++ {
 		bottom := height - offset - 1
-		right := width - offset - 1
 		for x, v := range (*typeMap)[offset] {
-			if neigh := valueAt(typeMap, Point{x, offset - 1}, OUTS); v == UNKN && neigh == OUTS {
+			// check neighbors left, right and center
+			l, r, c := val(Point{x+1, offset-1}), val(Point{x-1, offset-1}), val(Point{x, offset-1})
+			if v == UNKN && external(l, r, c) {
 				set(typeMap, Point{x, offset}, OUTS)
 				changed++
 			}
 		}
 		for x, v := range (*typeMap)[bottom] {
-			if neigh := valueAt(typeMap, Point{x, height + 1}, OUTS); v == UNKN && neigh == OUTS {
-				set(typeMap, Point{x, height}, OUTS)
+			l, r, c := val(Point{x-1, bottom+1}), val(Point{x+1, bottom+1}), val(Point{x, bottom+1})
+			if v == UNKN && external(l, r, c) {
+				set(typeMap, Point{x, bottom}, OUTS)
 				changed++
 			}
 		}
+	}
+	for offset := 0; offset < width; offset++ {
+		right := width - offset - 1
 		for y, row := range *typeMap {
-			if neigh := valueAt(typeMap, Point{offset - 1, y}, OUTS); row[offset] == UNKN && neigh == OUTS {
+			l, r, c := val(Point{offset-1, y-1}), val(Point{offset-1, y+1}), val(Point{offset-1, y})
+			if row[offset] == UNKN && external(l, r, c) {
 				set(typeMap, Point{offset, y}, OUTS)
 				changed++
 			}
-			if neigh := valueAt(typeMap, Point{right + 1, y}, OUTS); row[right] == UNKN && neigh == OUTS {
+			l, r, c = val(Point{right+1, y+1}), val(Point{right+1, y-1}), val(Point{right+1, y})
+			if row[right] == UNKN && external(l, r, c) {
 				set(typeMap, Point{right, y}, OUTS)
 				changed++
 			}
 		}
 	}
 	return
+}
+
+func external(left, right, center PType) bool {
+	if center == OUTS || left == OUTS || right == OUTS{
+		return true
+	}
+	return (left == LEKL && center == LEKR) || (center == LEKL && right == LEKR)
 }
 
 func countCandidates(distances *[][]int) (candidates int) {

@@ -10,41 +10,30 @@ import (
 	"time"
 )
 
+type Point struct {
+	x, y int
+}
 
+func (p Point) neighbor(x, y int) Point {
+	return Point{p.x + x, p.y + y}
+}
 
 func Main(f *os.File, part2 bool) {
-	display := map[PType]rune {
-		UNKN: ' ',
-		OUTS: 'X',
-		LEKL: '<',
-		LEKR: '>',
-	}
-
-
 	terrain := readFile(f)
-	distances := measureDistances(terrain)
+
 	if part2 {
-		setStartTo1(terrain, distances)
-		typeMap := convertToTypeMap(distances)
-		for changes := 1; changes > 0; {
-			changes = identifyOutside(terrain, typeMap) + findLeakage(terrain, typeMap)
-		}
+		typeMap := part2Main(terrain)
 		inside := 0
-		for y, row := range *typeMap {
-			for x, t := range row {
-				if t == PIPE {
-					fmt.Printf("%c", (*terrain)[y][x])
-				} else {
-					fmt.Printf("%c", display[t])
-				}
+		for _, row := range *typeMap {
+			for _, t := range row {
 				if t == UNKN {
 					inside++
 				}
 			}
-			fmt.Println()
 		}
 		fmt.Println("Number of inside points:", inside)
 	} else {
+		distances := measureDistances(terrain)
 		furthest := 0
 		for _, row := range *distances {
 			furthest = max(furthest, slices.Max(row))
@@ -53,32 +42,30 @@ func Main(f *os.File, part2 bool) {
 	}
 }
 
-type PType uint8
+func part2Main(terrain *[][]rune) *[][]Ptype {
+	typeMap := createTypeMap(terrain, measureDistances(terrain))
+	intersections := createIntersections(terrain, typeMap)
+	changes := identifyExternalPoints(intersections, typeMap)
+	for i := 1; changes > 0; i++ {
+		changes = findExternalIntersections(intersections, typeMap) + identifyExternalPoints(intersections, typeMap)
+	}
+	return typeMap
+}
+
+type Ptype uint8
 
 const (
-	UNKN PType = iota
+	UNKN Ptype = iota
 	PIPE
-	LEKL  // left side of leak
-	LEKR  // right side
-	LEKB  // bend if leak, i.e. a fork or elbow
 	OUTS
 )
 
-type Isect uint8
-const (
-	OPEN_NORTH Isect = 1 << 0
-	OPEN_SOUTH       = 1 << 1
-	OPEN_EAST        = 1 << 2
-	OPEN_WEST        = 1 << 3
-	EXTERNAL         = 1 << 4
-)
-
-func convertToTypeMap(distances *[][]int) *[][]PType {
-	typeMap := make([][]PType, len(*distances))
+func createTypeMap(terrain *[][]rune, distances *[][]int) *[][]Ptype {
+	typeMap := make([][]Ptype, len(*distances))
 	for i, row := range *distances {
-		typeMap[i] = make([]PType, len(row))
+		typeMap[i] = make([]Ptype, len(row))
 		for j, dist := range row {
-			if dist > 0 {
+			if dist > 0 || (*terrain)[i][j] == START {
 				typeMap[i][j] = PIPE
 			} else {
 				typeMap[i][j] = UNKN
@@ -88,204 +75,223 @@ func convertToTypeMap(distances *[][]int) *[][]PType {
 	return &typeMap
 }
 
-type Point struct {
-	x, y int
-}
-
-func (p Point) neighbor(x, y int) Point {
-	return Point{p.x + x, p.y + y}
-}
-
+type Itype uint8
 
 const (
-	CONNECT_EAST string = "LF-S"
-	CONNECT_WEST        = "J7-S"
-	CONNECT_NORTH       = "LJ|S"
-	CONNECT_SOUTH       = "F7|S"
+	OPEN_NORTH Itype = 1 << 0
+	OPEN_SOUTH       = 1 << 1
+	OPEN_EAST        = 1 << 2
+	OPEN_WEST        = 1 << 3
+	EXTERNAL         = 1 << 4
 )
 
-// Moving outside in, mark as LEKL or LEKR any two points where outside can
-// leak beyond the initial parimeter
-// TODO - possibly: implement elbows
-func findLeakage(terrain *[][]rune, typeMap *[][]PType) (changed int) {
-	width, height := len((*typeMap)[0]), len(*typeMap)
-	for offset := 0; offset < height; offset++ {
-		bottom := height - offset - 1
-		// top moving down
-		for rx, lx := 0, 1; lx < len((*typeMap)[offset]); rx, lx = lx, lx+1 {
-			rp, lp := Point{rx, offset}, Point{lx, offset}
-			rn, ln := Point{rx, offset-1}, Point{lx, offset-1}
-			if possibleLeak := leakSite(typeMap, lp, rp, ln, rn); !possibleLeak {
-				continue
-			}
-			rChar, lChar := valueAt(terrain, rp, '.'), valueAt(terrain, lp, '.')
-			if In(CONNECT_WEST, lChar) && In(CONNECT_EAST, rChar) {
-				continue
-			}
-			// fmt.Printf("T! LEAK %v %c %v %c\n", lp, lChar, rp, rChar)
-			set(typeMap, rp, LEKR)
-			set(typeMap, lp, LEKL)
-			changed++
-		}
-		// bottom moving up
-		for lx, rx := 0, 1; rx < len((*typeMap)[bottom]); lx, rx = rx, rx+1 {
-			rp, lp := Point{rx, bottom}, Point{lx, bottom}
-			rn, ln := Point{rx, bottom+1}, Point{lx, bottom+1}
-			if possibleLeak := leakSite(typeMap, lp, rp, ln, rn); !possibleLeak {
-				continue
-			}
-			rChar, lChar := valueAt(terrain, rp, '.'), valueAt(terrain, lp, '.')
-			if In(CONNECT_EAST, lChar) && In(CONNECT_WEST, rChar) {
-				continue
-			}
-			// fmt.Printf("B! LEAK %v %c %v %c\n", lp, lChar, rp, rChar)
-			set(typeMap, rp, LEKR)
-			set(typeMap, lp, LEKL)
-			changed++
-		}
-	}
-	for offset := 0; offset < width; offset++ {
-		right := width - offset - 1
-		// left moving right
-		for ly, ry := 0, 1; ry < len(*typeMap); ly, ry = ry, ry+1 {
-			rp, lp := Point{offset, ry}, Point{offset, ly}
-			rn, ln := Point{offset-1, ry}, Point{offset-1, ly}
-			if possibleLeak := leakSite(typeMap, lp, rp, ln, rn); !possibleLeak {
-				continue
-			}
-			rChar, lChar := valueAt(terrain, rp, '.'), valueAt(terrain, lp, '.')
-			if In(CONNECT_SOUTH, lChar) && In(CONNECT_NORTH, rChar) {
-				continue
-			}
-			// fmt.Printf("L! LEAK %v %c %v %c\n", lp, lChar, rp, rChar)
-			set(typeMap, rp, LEKR)
-			set(typeMap, lp, LEKL)
-			changed++
-		}
-		// right moving left
-		for ry, ly := 0, 1; ly < len(*typeMap); ry, ly = ly, ly+1 {
-			rp, lp := Point{right, ry}, Point{right, ly}
-			rn, ln := Point{right+1, ry}, Point{right+1, ly}
-			if possibleLeak := leakSite(typeMap, lp, rp, ln, rn); !possibleLeak {
-				continue
-			}
-			rChar, lChar := valueAt(terrain, rp, '.'), valueAt(terrain, lp, '.')
-			if In(CONNECT_NORTH, lChar) && In(CONNECT_SOUTH, rChar) {
-				continue
-			}
-			// fmt.Printf("R! LEAK %v %c %v %c\n", lp, lChar, rp, rChar)
-			set(typeMap, rp, LEKR)
-			set(typeMap, lp, LEKL)
-			changed++
-		}
-	}
-	return
+type Isect struct {
+	val uint8
 }
 
-
-// Examine a 2x2 block of map to determine if a leak is even worth assessing
-// For example, the below set of blocks, evaluated bottom up
-//
-// row A:  F7
-// row B:  ||
-// row C:  J|
-// row D:  .L
-// row E:  ..
-//
-// Assuming the points on row E are determined as external,
-// row C would be determined as a leak potential, due to the left neighbor
-// being an external point. Similarly rows B and A would need to be passed for
-// further evaluation as the points below them would be assessed ultimately as leak
-// points. Row A will ultimately close the loop, but this is evaluated outside this func
-func leakSite(typeMap *[][]PType, leftPoint, rightPoint, leftNeighbor, rightNeighbor Point) bool {
-	// confirm we are looking at pipe elements on both sides
-	rType := valueAt(typeMap, rightPoint, OUTS)
-	lType := valueAt(typeMap, leftPoint, OUTS)
-	if rType != PIPE || lType != PIPE {
-		return false
+func (i Isect) String() string {
+	chars := make([]rune, 0, 5)
+	if i.Is(EXTERNAL) {
+		chars = append(chars, 'X')
 	}
-	// confirm that we are at a possible leak point to begin with
-	rNeighType := valueAt(typeMap, rightNeighbor, OUTS)
-	lNeighType := valueAt(typeMap, leftNeighbor, OUTS)
-	return lNeighType == OUTS || rNeighType == OUTS || (lNeighType == LEKL && rNeighType == LEKR)
-	// if p {
-	// 	fmt.Println("Potential leak @", leftPoint, rightPoint)
-	// }
-	// return p
+	if i.Is(OPEN_NORTH) {
+		chars = append(chars, 'N')
+	}
+	if i.Is(OPEN_SOUTH) {
+		chars = append(chars, 'S')
+	}
+	if i.Is(OPEN_EAST) {
+		chars = append(chars, 'E')
+	}
+	if i.Is(OPEN_WEST) {
+		chars = append(chars, 'W')
+	}
+	return string(chars)
 }
 
-// Moving outside in, mark as external any point that's currently 0 (undefined)
-// and whose outside neighbor is -1 (exteranl)
-func identifyOutside(terrain *[][]rune, typeMap *[][]PType) (changed int) {
+func (i Isect) Is(t Itype) bool {
+	return i.val&uint8(t) == uint8(t)
+}
 
-	val := func(p Point) PType {
+func (i *Isect) Set(t Itype) {
+	i.val += uint8(t)
+}
+
+const (
+	CONNECT_EAST  string = "LF-S"
+	CONNECT_WEST         = "J7-S"
+	CONNECT_NORTH        = "LJ|S"
+	CONNECT_SOUTH        = "F7|S"
+)
+
+// given the initial map (terrain) and an indication of what is and is not
+// part of the actual pipe (types), determine in what directions one can move
+// from that points, e.g.
+//
+//	JL
+//	--
+//
+// This 2x2 block creates an intersection where one can move North, East, and West
+// assuming all 4 blocks are themselves part of the pipe structure.
+func createIntersections(terrain *[][]rune, types *[][]Ptype) *[][]Isect {
+
+	ter := func(p Point) rune {
+		return valueAt(terrain, p, '.')
+	}
+	typ := func(p Point) Ptype {
+		return valueAt(types, p, OUTS)
+	}
+
+	intersections := make([][]Isect, len(*terrain)-1)
+	for y := range intersections {
+		intersections[y] = make([]Isect, len((*terrain)[y])-1)
+		for x := range intersections[y] {
+			isect := Isect{0}
+			p1, p2, p3, p4 := Point{x, y}, Point{x + 1, y}, Point{x, y + 1}, Point{x + 1, y + 1}
+			t1, t2, t3, t4 := typ(p1), typ(p2), typ(p3), typ(p4)
+			c1, c4 := ter(p1), ter(p4)
+			if t1 == UNKN || t2 == UNKN || !In(CONNECT_EAST, c1) {
+				isect.Set(OPEN_NORTH)
+			}
+			if t1 == UNKN || t3 == UNKN || !In(CONNECT_SOUTH, c1) {
+				isect.Set(OPEN_WEST)
+			}
+			if t3 == UNKN || t4 == UNKN || !In(CONNECT_WEST, c4) {
+				isect.Set(OPEN_SOUTH)
+			}
+			if t2 == UNKN || t4 == UNKN || !In(CONNECT_NORTH, c4) {
+				isect.Set(OPEN_EAST)
+			}
+			intersections[y][x] = isect
+		}
+	}
+	return &intersections
+}
+
+// based on neighboring intersections and adjacent points, mark intersections as external
+func findExternalIntersections(intersections *[][]Isect, typeMap *[][]Ptype) (changed int) {
+	tp := func(p Point) Ptype {
 		return valueAt(typeMap, p, OUTS)
 	}
+	isExt := func(p Point) bool {
+		return valueAt(intersections, p, Isect{0b11111}).Is(EXTERNAL)
+	}
+	// are any of the four of points that make up an intersection external
+	containsExternal := func(thisPoint Point) bool {
+		p2, p3, p4 := thisPoint.neighbor(1, 0), thisPoint.neighbor(0, 1), thisPoint.neighbor(1, 1)
+		return tp(thisPoint) == OUTS || tp(p2) == OUTS || tp(p3) == OUTS || tp(p4) == OUTS
+	}
+
+	width, height := len((*intersections)[0]), len(*intersections)
+	for row := 0; row < height; row++ {
+		for x, thisIsect := range (*intersections)[row] {
+			if thisIsect.Is(EXTERNAL) {
+				continue
+			}
+			thisPoint := Point{x, row}
+			if containsExternal(thisPoint) || thisIsect.Is(OPEN_WEST) && isExt(thisPoint.neighbor(-1, 0)) {
+				thisIsect.Set(EXTERNAL)
+				set(intersections, thisPoint, thisIsect)
+				changed++
+			}
+		}
+		for x := width - 1; x >= 0; x-- {
+			thisPoint := Point{x, row}
+			thisIsect := (*intersections)[row][x]
+			if thisIsect.Is(EXTERNAL) {
+				continue
+			}
+			if containsExternal(thisPoint) || thisIsect.Is(OPEN_EAST) && isExt(thisPoint.neighbor(1, 0)) {
+				thisIsect.Set(EXTERNAL)
+				set(intersections, thisPoint, thisIsect)
+				changed++
+			}
+		}
+	}
+	for col := 0; col < width; col++ {
+		for y := range *intersections {
+			thisPoint := Point{col, y}
+			thisIsect := (*intersections)[y][col]
+			if thisIsect.Is(EXTERNAL) {
+				continue
+			}
+			if containsExternal(thisPoint) || thisIsect.Is(OPEN_NORTH) && isExt(thisPoint.neighbor(0, -1)) {
+				thisIsect.Set(EXTERNAL)
+				set(intersections, thisPoint, thisIsect)
+				changed++
+			}
+		}
+		for y := height - 1; y >= 0; y-- {
+			thisPoint := Point{col, y}
+			thisIsect := (*intersections)[y][col]
+			if thisIsect.Is(EXTERNAL) {
+				continue
+			}
+			if containsExternal(thisPoint) || thisIsect.Is(OPEN_SOUTH) && isExt(thisPoint.neighbor(0, 1)) {
+				thisIsect.Set(EXTERNAL)
+				set(intersections, thisPoint, thisIsect)
+				changed++
+			}
+		}
+	}
+	return
+}
+
+// based on neighboring items and adjacent intersections, mark points as external
+func identifyExternalPoints(intersections *[][]Isect, typeMap *[][]Ptype) (changed int) {
+
+	tp := func(p Point) Ptype {
+		return valueAt(typeMap, p, OUTS)
+	}
+	isect := func(p Point) Isect {
+		return valueAt(intersections, p, Isect{0b11111})
+	}
+	update := func(this, l, r, c, li, ri Point) {
+		if tp(l) == OUTS || tp(r) == OUTS || tp(c) == OUTS || isect(li).Is(EXTERNAL) || isect(ri).Is(EXTERNAL) {
+			set(typeMap, this, OUTS)
+			changed++
+		}
+	}
 
 	width, height := len((*typeMap)[0]), len(*typeMap)
-	for offset := 0; offset < height; offset++ {
-		bottom := height - offset - 1
-		for x, v := range (*typeMap)[offset] {
-			// check neighbors left, right and center
-			l, r, c := val(Point{x+1, offset-1}), val(Point{x-1, offset-1}), val(Point{x, offset-1})
-			if v == UNKN && external(l, r, c) {
-				set(typeMap, Point{x, offset}, OUTS)
-				changed++
+	for row := 0; row < height; row++ {
+		for x, thisType := range (*typeMap)[row] {
+			if thisType != UNKN {
+				continue
 			}
+			thisPoint := Point{x, row}
+			l, r, c := thisPoint.neighbor(-1, -1), thisPoint.neighbor(-1, 1), thisPoint.neighbor(-1, 0)
+			update(thisPoint, l, r, c, l, c)
 		}
-		for x, v := range (*typeMap)[bottom] {
-			l, r, c := val(Point{x-1, bottom+1}), val(Point{x+1, bottom+1}), val(Point{x, bottom+1})
-			if v == UNKN && external(l, r, c) {
-				set(typeMap, Point{x, bottom}, OUTS)
-				changed++
+		for x := width - 1; x >= 0; x-- {
+			thisPoint := Point{x, row}
+			if tp(thisPoint) != UNKN {
+				continue
 			}
+			l, r, c := thisPoint.neighbor(1, 1), thisPoint.neighbor(1, -1), thisPoint.neighbor(1, 0)
+			update(thisPoint, l, r, c, thisPoint, thisPoint.neighbor(0, -1))
 		}
 	}
-	for offset := 0; offset < width; offset++ {
-		right := width - offset - 1
-		for y, row := range *typeMap {
-			l, r, c := val(Point{offset-1, y-1}), val(Point{offset-1, y+1}), val(Point{offset-1, y})
-			if row[offset] == UNKN && external(l, r, c) {
-				set(typeMap, Point{offset, y}, OUTS)
-				changed++
+
+	for col := 0; col < width; col++ {
+		for y := range *typeMap {
+			thisPoint := Point{col, y}
+			if tp(thisPoint) != UNKN {
+				continue
 			}
-			l, r, c = val(Point{right+1, y+1}), val(Point{right+1, y-1}), val(Point{right+1, y})
-			if row[right] == UNKN && external(l, r, c) {
-				set(typeMap, Point{right, y}, OUTS)
-				changed++
+			l, r, c := thisPoint.neighbor(1, -1), thisPoint.neighbor(-1, -1), thisPoint.neighbor(0, -1)
+			update(thisPoint, l, r, c, c, r)
+		}
+		for y := height - 1; y >= 0; y-- {
+			thisPoint := Point{col, y}
+			if tp(thisPoint) != UNKN {
+				continue
 			}
+			l, r, c := thisPoint.neighbor(-1, 1), thisPoint.neighbor(1, 1), thisPoint.neighbor(0, 1)
+			update(thisPoint, l, r, c, thisPoint.neighbor(-1, 0), thisPoint)
 		}
 	}
 	return
-}
-
-func external(left, right, center PType) bool {
-	if center == OUTS || left == OUTS || right == OUTS{
-		return true
-	}
-	return (left == LEKL && center == LEKR) || (center == LEKL && right == LEKR)
-}
-
-func countCandidates(distances *[][]int) (candidates int) {
-	for _, row := range *distances {
-		for _, v := range row {
-			if v == 0 {
-				candidates++
-			}
-		}
-	}
-	return
-}
-
-func setStartTo1(terrain *[][]rune, distances *[][]int) {
-	for y, row := range *terrain {
-		for x, r := range row {
-			if r == START {
-				update(distances, Point{x, y}, 1)
-				return
-			}
-		}
-	}
 }
 
 func measureDistances(lines *[][]rune) *[][]int {
